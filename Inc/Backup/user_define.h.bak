@@ -1,0 +1,10 @@
+/** 화제 감지시 LED켜지고, 저항 가변으로 100옴으로 부하 증가, OP_AMP 전원 ON, TX 신호 보내는 트랜지스터 ON)**/
+#define TX_ON GPIOA-> ODR |= GPIO_PIN_10 //PA10---->1 
+#define TX_OFF GPIOA-> ODR &= ~GPIO_PIN_10 //PA10---->0
+
+/** 회로(선로) 번호 및 장비 번호를 스위치의 ON OFF 상태에 따라 입력 받음 **/
+#define KEY_Sche_H GPIOC-> ODR |= GPIO_PIN_14 //PC14---->1 
+#define KEY_Sche_L GPIOC-> ODR &= ~GPIO_PIN_14 //PC14---->0
+
+#define KEY_Equip_H GPIOC-> ODR |= GPIO_PIN_15 //PC15---->1 
+#define KEY_Equip_L GPIOC-> ODR &= ~GPIO_PIN_15 //PC15---->0

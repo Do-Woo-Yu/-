@@ -1,0 +1,408 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file    stm32l0xx_it.c
+  * @brief   Interrupt Service Routines.
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2025 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+
+/* Includes ------------------------------------------------------------------*/
+#include "main.h"
+#include "stm32l0xx_it.h"
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+#include "extern.h"
+#include "user_define.h"
+#include <string.h>
+#include <stdio.h>
+/* USER CODE END Includes */
+
+/* Private typedef -----------------------------------------------------------*/
+/* USER CODE BEGIN TD */
+
+/* USER CODE END TD */
+
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+
+/* USER CODE END PD */
+
+/* Private macro -------------------------------------------------------------*/
+/* USER CODE BEGIN PM */
+
+/* USER CODE END PM */
+
+/* Private variables ---------------------------------------------------------*/
+/* USER CODE BEGIN PV */
+
+/* USER CODE END PV */
+
+/* Private function prototypes -----------------------------------------------*/
+/* USER CODE BEGIN PFP */
+
+/* USER CODE END PFP */
+
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
+byte adc_cnt = 0;
+unsigned long int ADC_Value_0 = 0, ADC_Value_1 = 0;
+unsigned long int THERMISTOR_0_AD[50],THERMISTOR_1_AD[50];
+unsigned long int CAL_THERMISTOR_0_AD = 0,  CAL_THERMISTOR_1_AD = 0, THERMISTOR_0_Vol = 0, THERMISTOR_1_Vol = 0;
+
+unsigned int Rcv1_cnt = 0, Tx1_send_number = 0,Tx1_index = 0;
+byte Tx_buffer[7] = {0x01,0x04,0x02,0x00,0x01,0x78,0xF0};
+byte test_index = 0,test_rxbuf[100];
+
+byte Fire_Fg = 0;
+
+byte Rx1_buf[100];
+word CheckSum_data;
+byte CheckSum_ing = 0;
+byte Rx1_step = 0,Rx1_index = 0;
+byte Rx1_CRC_H = 0, Rx1_CRC_L = 0, CheckSum_EN = 0;
+byte rx1_data;
+/* USER CODE END 0 */
+
+/* External variables --------------------------------------------------------*/
+extern ADC_HandleTypeDef hadc;
+extern LPTIM_HandleTypeDef hlptim1;
+extern UART_HandleTypeDef hlpuart1;
+/* USER CODE BEGIN EV */
+void P_Type_Reciever_Tx(byte p_reciever__tx_num);
+/* USER CODE END EV */
+
+/******************************************************************************/
+/*           Cortex-M0+ Processor Interruption and Exception Handlers          */
+/******************************************************************************/
+/**
+  * @brief This function handles Non maskable interrupt.
+  */
+void NMI_Handler(void)
+{
+  /* USER CODE BEGIN NonMaskableInt_IRQn 0 */
+
+  /* USER CODE END NonMaskableInt_IRQn 0 */
+  /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
+  while (1)
+  {
+  }
+  /* USER CODE END NonMaskableInt_IRQn 1 */
+}
+
+/**
+  * @brief This function handles Hard fault interrupt.
+  */
+void HardFault_Handler(void)
+{
+  /* USER CODE BEGIN HardFault_IRQn 0 */
+
+  /* USER CODE END HardFault_IRQn 0 */
+  while (1)
+  {
+    /* USER CODE BEGIN W1_HardFault_IRQn 0 */
+    /* USER CODE END W1_HardFault_IRQn 0 */
+  }
+}
+
+/**
+  * @brief This function handles System service call via SWI instruction.
+  */
+void SVC_Handler(void)
+{
+  /* USER CODE BEGIN SVC_IRQn 0 */
+
+  /* USER CODE END SVC_IRQn 0 */
+  /* USER CODE BEGIN SVC_IRQn 1 */
+
+  /* USER CODE END SVC_IRQn 1 */
+}
+
+/**
+  * @brief This function handles Pendable request for system service.
+  */
+void PendSV_Handler(void)
+{
+  /* USER CODE BEGIN PendSV_IRQn 0 */
+
+  /* USER CODE END PendSV_IRQn 0 */
+  /* USER CODE BEGIN PendSV_IRQn 1 */
+
+  /* USER CODE END PendSV_IRQn 1 */
+}
+
+/**
+  * @brief This function handles System tick timer.
+  */
+void SysTick_Handler(void)
+{
+  /* USER CODE BEGIN SysTick_IRQn 0 */
+
+  /* USER CODE END SysTick_IRQn 0 */
+  HAL_IncTick();
+  /* USER CODE BEGIN SysTick_IRQn 1 */
+
+  /* USER CODE END SysTick_IRQn 1 */
+}
+
+/******************************************************************************/
+/* STM32L0xx Peripheral Interrupt Handlers                                    */
+/* Add here the Interrupt Handlers for the used peripherals.                  */
+/* For the available peripheral interrupt handler names,                      */
+/* please refer to the startup file (startup_stm32l0xx.s).                    */
+/******************************************************************************/
+
+/**
+  * @brief This function handles ADC global interrupt.
+  */
+void ADC1_IRQHandler(void)
+{
+  /* USER CODE BEGIN ADC1_IRQn 0 */
+
+  /* USER CODE END ADC1_IRQn 0 */
+  HAL_ADC_IRQHandler(&hadc);
+  /* USER CODE BEGIN ADC1_IRQn 1 */
+
+  /* USER CODE END ADC1_IRQn 1 */
+}
+
+/**
+  * @brief This function handles LPTIM1 global interrupt / LPTIM1 wake-up interrupt through EXTI line 29.
+  */
+void LPTIM1_IRQHandler(void) // 1000ms TIMER
+{
+    /* 인터럽트 발생 여부 확인 */
+    if (__HAL_LPTIM_GET_FLAG(&hlptim1, LPTIM_ISR_ARRM))
+    {
+        /* 인터럽트 플래그 클리어 (인터럽트 발생 후 클리어) */
+		__HAL_LPTIM_CLEAR_FLAG(&hlptim1, LPTIM_ISR_ARRM);
+	  
+		static unsigned int timer_test_cnt;
+		static byte thermister_0_adc_cnt, thermister_1_adc_cnt;
+		timer_test_cnt++;
+
+		if (ADC1->ISR & ADC_ISR_EOC)  // 변환 완료 확인 후 데이터 읽기
+		{
+			if(adc_cnt == 0)
+			{
+				ADC_Value_0 = ADC1->DR;
+				THERMISTOR_0_AD[thermister_0_adc_cnt] = ADC_Value_0;
+			
+				if(thermister_0_adc_cnt >= 2) // thermister_0_adc_cnt이 2이상일경우 이동 평균 값
+				{
+					if(THERMISTOR_0_AD[49] != 0)
+					{
+						for(byte i = thermister_0_adc_cnt - 2; i <= thermister_0_adc_cnt; i++)
+						{
+							CAL_THERMISTOR_0_AD += THERMISTOR_0_AD[i];
+						}
+						THERMISTOR_0_Vol = (CAL_THERMISTOR_0_AD * 1100) >> 12; // 3개 평균낸 ADC값
+					}
+					else // 초기 0번째 인덱스 값은 더미 데이터이므로 계산하지 않음
+					{
+						if(thermister_0_adc_cnt == 2)
+						{
+							CAL_THERMISTOR_0_AD += THERMISTOR_0_AD[1];
+							CAL_THERMISTOR_0_AD += THERMISTOR_0_AD[2];
+							THERMISTOR_0_Vol = (CAL_THERMISTOR_0_AD * 1650) >> 12;  // 배열 인덱스 1,2 평균 ADC값
+						}
+						else
+						{
+							for(byte i = thermister_0_adc_cnt - 2; i <= thermister_0_adc_cnt; i++)
+							{
+								CAL_THERMISTOR_0_AD += THERMISTOR_0_AD[i];
+							}
+							THERMISTOR_0_Vol = (CAL_THERMISTOR_0_AD * 1100) >> 12; // 3개 평균낸 ADC값
+						}
+					}
+				} 
+				else if(thermister_0_adc_cnt < 2) // thermister_0_adc_cnt이 2이하일경우 이동 평균 값
+				{
+					if(thermister_0_adc_cnt == 0)
+					{
+						if(THERMISTOR_0_AD[49] != 0)
+						{
+							CAL_THERMISTOR_0_AD += THERMISTOR_0_AD[48];
+							CAL_THERMISTOR_0_AD += THERMISTOR_0_AD[49];
+							CAL_THERMISTOR_0_AD += THERMISTOR_0_AD[0];
+							THERMISTOR_0_Vol = (CAL_THERMISTOR_0_AD * 1100) >> 12;  // 3개 평균낸 ADC값
+						}
+					}
+					else if(thermister_0_adc_cnt == 1)
+					{
+						if(THERMISTOR_0_AD[49] != 0)
+						{
+							CAL_THERMISTOR_0_AD += THERMISTOR_0_AD[49];
+							CAL_THERMISTOR_0_AD += THERMISTOR_0_AD[0];
+							CAL_THERMISTOR_0_AD += THERMISTOR_0_AD[1];
+							THERMISTOR_0_Vol = (CAL_THERMISTOR_0_AD * 1100) >> 12;  // 3개 평균낸 ADC값
+						}
+						else
+						{
+							CAL_THERMISTOR_0_AD += THERMISTOR_0_AD[1];
+							THERMISTOR_0_Vol = (CAL_THERMISTOR_0_AD * 3300) >> 12;  // 1개  ADC값
+						}
+					}
+				}
+				
+				if(++thermister_0_adc_cnt >= 50)
+				{
+					thermister_0_adc_cnt = 0;
+				}
+				adc_cnt = 1;
+				// 4번 채널 활성화, 5번 채널 비활성화
+				ADC1->CHSELR = ADC_CHANNEL_4;
+			}
+			else if(adc_cnt == 1)
+			{
+				ADC_Value_1 = ADC1->DR;
+				THERMISTOR_1_AD[thermister_1_adc_cnt] = ADC_Value_1;
+				
+				if(thermister_1_adc_cnt >= 2) // thermister_1_adc_cnt이 2이상일경우 이동 평균 값
+				{
+					if(THERMISTOR_1_AD[49] != 0)
+					{
+						for(byte i = thermister_1_adc_cnt - 2; i <= thermister_1_adc_cnt; i++)
+						{
+							CAL_THERMISTOR_1_AD += THERMISTOR_1_AD[i];
+						}
+						THERMISTOR_1_Vol = (CAL_THERMISTOR_1_AD * 1100) >> 12; // 3개 평균낸 ADC값
+					}
+					else // 초기 0번째 인덱스 값은 더미 데이터이므로 계산하지 않음
+					{
+						if(thermister_1_adc_cnt == 2)
+						{
+							CAL_THERMISTOR_1_AD += THERMISTOR_1_AD[1];
+							CAL_THERMISTOR_1_AD += THERMISTOR_1_AD[2];
+							THERMISTOR_1_Vol = (CAL_THERMISTOR_1_AD * 1650) >> 12;  // 배열 인덱스 1,2 평균 ADC값
+						}
+						else
+						{
+							for(byte i = thermister_1_adc_cnt - 2; i <= thermister_1_adc_cnt; i++)
+							{
+								CAL_THERMISTOR_1_AD += THERMISTOR_1_AD[i];
+							}
+							THERMISTOR_1_Vol = (CAL_THERMISTOR_1_AD * 1100) >> 12; // 3개 평균낸 ADC값
+						}
+					}
+				}
+				else if(thermister_1_adc_cnt < 2) // thermister_1_adc_cnt이 2이하일경우 이동 평균 값
+				{
+					if(thermister_1_adc_cnt == 0)
+					{
+						if(THERMISTOR_1_AD[49] != 0)
+						{
+							CAL_THERMISTOR_1_AD += THERMISTOR_1_AD[48];
+							CAL_THERMISTOR_1_AD += THERMISTOR_1_AD[49];
+							CAL_THERMISTOR_1_AD += THERMISTOR_1_AD[0];
+							THERMISTOR_1_Vol = (CAL_THERMISTOR_1_AD * 1100) >> 12;  // 3개 평균낸 ADC값
+						}
+					}
+					else if(thermister_1_adc_cnt == 1)
+					{
+						if(THERMISTOR_1_AD[49] != 0)
+						{
+							CAL_THERMISTOR_1_AD += THERMISTOR_1_AD[49];
+							CAL_THERMISTOR_1_AD += THERMISTOR_1_AD[0];
+							CAL_THERMISTOR_1_AD += THERMISTOR_1_AD[1];
+							THERMISTOR_1_Vol = (CAL_THERMISTOR_1_AD * 1100) >> 12;  // 3개 평균낸 ADC값
+						}
+						else
+						{
+							CAL_THERMISTOR_1_AD += THERMISTOR_1_AD[1];
+							THERMISTOR_1_Vol = (CAL_THERMISTOR_1_AD * 3300) >> 12;  // 1개  ADC값
+						}
+					}
+				}
+				
+				if(++thermister_1_adc_cnt >= 50)
+				{
+					thermister_1_adc_cnt = 0;
+				}
+				adc_cnt = 0;
+				// 5번 채널 활성화, 4번 채널 비활성화
+				ADC1->CHSELR = ADC_CHANNEL_5;
+			}
+			
+			if(THERMISTOR_0_Vol != 0 && THERMISTOR_1_Vol != 0)
+			{
+				if((THERMISTOR_0_Vol <= 2000 || THERMISTOR_1_Vol <= 2000) && Fire_Fg == 0) // 화재가 나면 초기화 될때까지 여기를 다시 들어오지 않음
+				{
+					Fire_Fg = 1;
+					TX_ON;
+					Power_5V_OK = 1;
+				}
+			}
+		}
+		
+		// ADC 변환 시작
+		ADC1->CR |= ADC_CR_ADSTART;
+		
+		// 써미스터 0,1 AD 더한값을 초기화함
+		CAL_THERMISTOR_0_AD = 0;
+		CAL_THERMISTOR_1_AD = 0;
+	} 
+}
+
+/**
+  * @brief This function handles LPUART1 global interrupt / LPUART1 wake-up interrupt through EXTI line 28.
+  */
+void LPUART1_IRQHandler(void)
+{
+  /* USER CODE BEGIN LPUART1_IRQn 0 */
+	if((LPUART1->CR1 & USART_CR1_RXNEIE) && (LPUART1-> ISR & USART_ISR_RXNE))	// 수신버퍼가 채워졌다면?	
+	{		
+		Rcv1_cnt++;
+		rx1_data = LPUART1->RDR;	// 수신값 저장
+		if (test_index < sizeof(test_rxbuf))
+			test_rxbuf[test_index++] = rx1_data;
+		else
+			test_index = 0;  // 혹은 순환 버퍼 사용
+	}
+	else if((LPUART1->CR1 & USART_CR1_TCIE) && (LPUART1->ISR & USART_ISR_TC))
+	{
+		static byte Tx3_cnt=0;
+		Tx3_cnt++;
+		if(Tx1_send_number)
+		{
+			Tx1_send_number--;  
+			LPUART1->TDR = Tx_buffer[Tx1_index++];
+		}
+		else	//모든 Data 전송 하였음.
+		{
+			LPUART1->CR1 |= USART_CR1_RXNEIE; 	// UART2's RXE Interrupt Enable		
+			LPUART1->CR1 &= ~USART_CR1_TCIE;		// UART2's TXE Interrupt Disable
+		}
+		return;	
+	}
+	
+  /* USER CODE END LPUART1_IRQn 0 */
+  //HAL_UART_IRQHandler(&hlpuart1);
+  /* USER CODE BEGIN LPUART1_IRQn 1 */
+
+  /* USER CODE END LPUART1_IRQn 1 */
+}
+
+/* USER CODE BEGIN 1 */
+
+void P_Type_Reciever_Tx(byte p_reciever__tx_num)	//UART1
+{
+	/*Send the character*/
+	LPUART1->TDR = Tx_buffer[0];
+	Tx1_index = 1;
+	Tx1_send_number = p_reciever__tx_num-1;
+	LPUART1->CR1 &= ~USART_CR1_RXNEIE; 	//USART3's RXE Interrupt Disable	
+	LPUART1->CR1 |= USART_CR1_TCIE; 		//USART3's TXE Interrupt Enable	
+}
+
+/* USER CODE END 1 */
